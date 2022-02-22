@@ -11,8 +11,27 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from util import masked_softmax
 
+class CharEmbedding(nn.Module):
+    def __init__(self, char_vectors, hidden_size, drop_prob):
+        super(CharEmbedding, self).__init__()
+        self.drop_prob = drop_prob
+        self.hidden_size = hidden_size
+        self.char_embed = nn.Embedding.from_pretrained(char_vectors) 
+        self.char_conv = nn.Sequential(
+            nn.Conv1d(1, hidden_size, kernel_size=(1, 5), padding=0, bias=True),
+            nn.ReLU()
+        )
+    
+    def forward(self, x):
+        emb = self.char_embed(x) # (batch_size, seq_len, word_len, embed_size)
+        emb = emb.sum(2) # (batch_size, seq_len, embed_size)
+        emb = emb.unsqueeze(1) # (batch_size, channel_in, seq_len, embed_size)
+        emb = self.char_conv(emb)
+        emb, _ = torch.max(emb, dim=3) # (batch_size, hidden_size, seq_len)
+        emb = emb.transpose(1, 2) # (batch_size, seq_len, hidden_size)
+        return emb
 
-class Embedding(nn.Module):
+class WordEmbedding(nn.Module):
     """Embedding layer used by BiDAF, with the character-level component.
 
     Word-level embeddings are further refined using a 2-layer Highway Encoder
@@ -23,22 +42,23 @@ class Embedding(nn.Module):
         hidden_size (int): Size of hidden activations.
         drop_prob (float): Probability of zero-ing out activations
     """
-    def __init__(self, char_vectors, word_vectors, hidden_size, drop_prob):
-        super(Embedding, self).__init__()
+    def __init__(self, word_vectors, hidden_size, drop_prob):
+        super(WordEmbedding, self).__init__()
         self.drop_prob = drop_prob
-        
-        self.char_embed = nn.Embedding(char_vectors)
-        nn.init.uniform(self.char_embed.weight, -0.001, 0.001)      
-
         self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
         self.hwy = HighwayEncoder(2, hidden_size)
 
-    def forward(self, x):
-        emb = self.word_embed(x)   # (batch_size, seq_len, embed_size)
+    def forward(self, x1, x2):
+        emb = self.word_embed(x1)  # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
         emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        emb = self.hwy(emb)   # (batch_size, seq_len, hidden_size)
+        print(emb.shape)
+        print(x2.shape)
+        emb = torch.cat([emb, x2], dim=-1)  # (batch_size, seq_len, hidden_size)
+        print(emb.shape)
+        
+        emb = self.hwy(emb)   # (batch_size, 2 * seq_len, hidden_size)
 
         return emb
 

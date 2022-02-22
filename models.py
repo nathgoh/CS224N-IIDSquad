@@ -33,8 +33,11 @@ class BiDAF(nn.Module):
     def __init__(self, char_vectors, word_vectors, hidden_size, drop_prob=0.):
         super(BiDAF, self).__init__()
                 
-        self.emb_word = layers.Embedding(char_vectors=char_vectors,
-                                    word_vectors=word_vectors,
+        self.emb_char = layers.CharEmbedding(char_vectors=char_vectors,
+                                        hidden_size=hidden_size,
+                                        drop_prob=drop_prob)
+        
+        self.emb_word = layers.WordEmbedding(word_vectors=word_vectors,
                                     hidden_size=hidden_size,
                                     drop_prob=drop_prob)
 
@@ -58,14 +61,17 @@ class BiDAF(nn.Module):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
+        
+        cc_emb = self.emb_char(cc_idxs)
+        qc_emb = self.emb_char(qc_idxs)
 
-        c_emb = self.emb_word(cw_idxs)         # (batch_size, c_len, hidden_size)
-        q_emb = self.emb_word(qw_idxs)         # (batch_size, q_len, hidden_size)
+        cw_emb = self.emb_word(cw_idxs, cc_emb)     # (batch_size, c_len, hidden_size)
+        qw_emb = self.emb_word(qw_idxs, qc_emb)     # (batch_size, q_len, hidden_size)
 
-        c_enc = self.enc(c_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
-        q_enc = self.enc(q_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
+        cw_enc = self.enc(cw_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
+        qw_enc = self.enc(qw_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)
 
-        att = self.att(c_enc, q_enc,
+        att = self.att(cw_enc, qw_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
 
         mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
