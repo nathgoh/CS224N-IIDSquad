@@ -24,6 +24,7 @@ class CharEmbedding(nn.Module):
     
     def forward(self, x):
         emb = self.char_embed(x) # (batch_size, seq_len, word_len, embed_size)
+        emb = F.dropout(emb, self.drop_prob, self.training)
         emb = emb.sum(2) # (batch_size, seq_len, embed_size)
         emb = emb.unsqueeze(1) # (batch_size, channel_in, seq_len, embed_size)
         emb = self.char_conv(emb)
@@ -47,14 +48,14 @@ class WordEmbedding(nn.Module):
         self.drop_prob = drop_prob
         self.word_embed = nn.Embedding.from_pretrained(word_vectors)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        self.hwy = HighwayEncoder(2, hidden_size)
+        self.hwy = HighwayEncoder(2, 2 * hidden_size)
 
     def forward(self, x1, x2):
         emb = self.word_embed(x1)  # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
-        emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        emb = torch.cat([emb, x2], dim=0)  # (batch_size, seq_len, hidden_size)
-        emb = self.hwy(emb)   # (2 * batch_size, seq_len, hidden_size)
+        emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)        
+        emb = torch.cat([x2, emb], dim=-1)  # (batch_size, seq_len, hidden_size)
+        emb = self.hwy(emb)   # (batch_size, seq_len, 2 * hidden_size)
 
         return emb
 
@@ -80,7 +81,7 @@ class HighwayEncoder(nn.Module):
 
     def forward(self, x):
         for gate, transform in zip(self.gates, self.transforms):
-            # Shapes of g, t, and x are all (batch_size, seq_len, hidden_size)
+            # Shapes of g, t, and x are all (batch_size, seq_len, hidden_size)          
             g = torch.sigmoid(gate(x))
             t = F.relu(transform(x))
             x = g * t + (1 - g) * x
