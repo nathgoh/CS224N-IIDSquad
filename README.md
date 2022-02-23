@@ -1,4 +1,5 @@
 # CS224N default final project (2022 IID SQuAD track)
+This is a full implementation of the [BiDAF](https://arxiv.org/pdf/1611.01603.pdf) paper
 
 ## Setup
 
