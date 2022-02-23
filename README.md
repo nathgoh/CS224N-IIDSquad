@@ -1,5 +1,4 @@
 # CS224N default final project (2022 IID SQuAD track)
-No character-level embedding
 ## Setup
 
 1. Make sure you have [Miniconda](https://conda.io/docs/user-guide/install/index.html#regular-installation) installed
