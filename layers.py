@@ -53,12 +53,8 @@ class WordEmbedding(nn.Module):
         emb = self.word_embed(x1)  # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
         emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)
-        print(emb.shape)
-        print(x2.shape)
-        emb = torch.cat([emb, x2], dim=-1)  # (batch_size, seq_len, hidden_size)
-        print(emb.shape)
-        
-        emb = self.hwy(emb)   # (batch_size, 2 * seq_len, hidden_size)
+        emb = torch.cat([emb, x2], dim=0)  # (batch_size, seq_len, hidden_size)
+        emb = self.hwy(emb)   # (2 * batch_size, seq_len, hidden_size)
 
         return emb
 
