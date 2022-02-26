@@ -16,9 +16,9 @@ class CharEmbedding(nn.Module):
         super(CharEmbedding, self).__init__()
         self.drop_prob = drop_prob
         self.hidden_size = hidden_size
-        self.char_embed = nn.Embedding.from_pretrained(char_vectors) 
+        self.char_embed = nn.Embedding.from_pretrained(char_vectors, freeze=False) 
         self.char_conv = nn.Sequential(
-            nn.Conv1d(1, hidden_size, kernel_size=(1, 5), padding=0, bias=True),
+            nn.Conv2d(1, hidden_size, kernel_size=(1, 5), padding=0, bias=True),
             nn.ReLU()
         )
     
@@ -46,7 +46,7 @@ class WordEmbedding(nn.Module):
     def __init__(self, word_vectors, hidden_size, drop_prob):
         super(WordEmbedding, self).__init__()
         self.drop_prob = drop_prob
-        self.word_embed = nn.Embedding.from_pretrained(word_vectors)
+        self.word_embed = nn.Embedding.from_pretrained(word_vectors, freeze=True)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
         self.hwy = HighwayEncoder(2, 2 * hidden_size)
 
