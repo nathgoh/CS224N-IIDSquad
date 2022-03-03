@@ -41,7 +41,7 @@ class BiDAF(nn.Module):
                                     hidden_size=hidden_size,
                                     drop_prob=drop_prob)
 
-        self.enc = layers.RNNEncoder(input_size=2 * hidden_size,
+        self.enc = layers.RNNEncoder(input_size=3 * hidden_size,
                                      hidden_size=hidden_size,
                                      num_layers=1,
                                      drop_prob=drop_prob)
@@ -57,7 +57,7 @@ class BiDAF(nn.Module):
         self.out = layers.BiDAFOutput(hidden_size=hidden_size,
                                       drop_prob=drop_prob)
 
-    def forward(self, cw_idxs, qw_idxs, cc_idxs, qc_idxs):
+    def forward(self, cw_idxs, qw_idxs, cc_idxs, qc_idxs, wiq, wiqa):
         c_mask = torch.zeros_like(cw_idxs) != cw_idxs
         q_mask = torch.zeros_like(qw_idxs) != qw_idxs
         c_len, q_len = c_mask.sum(-1), q_mask.sum(-1)
@@ -65,8 +65,8 @@ class BiDAF(nn.Module):
         cc_emb = self.emb_char(cc_idxs)
         qc_emb = self.emb_char(qc_idxs)
 
-        cw_emb = self.emb_word(cw_idxs, cc_emb)     # (batch_size, c_len, hidden_size)
-        qw_emb = self.emb_word(qw_idxs, qc_emb)     # (batch_size, q_len, hidden_size)
+        cw_emb = self.emb_word(cw_idxs, cc_emb, wiq)     # (batch_size, c_len, hidden_size)
+        qw_emb = self.emb_word(qw_idxs, qc_emb, wiqa)     # (batch_size, q_len, hidden_size)
 
         cw_enc = self.enc(cw_emb, c_len)    # (batch_size, c_len, 2 * hidden_size)
         qw_enc = self.enc(qw_emb, q_len)    # (batch_size, q_len, 2 * hidden_size)

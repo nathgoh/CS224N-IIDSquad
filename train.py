@@ -98,8 +98,13 @@ def main(args):
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
-                # Word-in-question features
-                wiq_b = wiq_binary(qw_idxs, cw_idxs, y1, y2, args.batch_size)                
+                # Word-in-question feature
+                wiq_b = wiq_binary(qw_idxs, cw_idxs, args.batch_size)                
+                wiq_b = wiq_b.to(device)
+                
+                # Word-in-question-answer feature
+                wiqa_b = wiqa_binary(qw_idxs, cw_idxs, y1, y2, args.batch_size)                
+                wiqa_b = wiqa_b.to(device)
                 
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
@@ -110,7 +115,7 @@ def main(args):
                 optimizer.zero_grad()
 
                 # Forward
-                log_p1, log_p2 = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
+                log_p1, log_p2 = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs, wiq_b, wiqa_b)
                 y1, y2 = y1.to(device), y2.to(device)
                 loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
                 loss_val = loss.item()
@@ -173,14 +178,23 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
     with torch.no_grad(), \
             tqdm(total=len(data_loader.dataset)) as progress_bar:
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
+            # Word-in-question feature
+            wiq_b = wiq_binary(qw_idxs, cw_idxs, args.batch_size)                
+            wiq_b = wiq_b.to(device)
+            
+            # Word-in-question-answer feature
+            wiqa_b = wiqa_binary(qw_idxs, cw_idxs, y1, y2, args.batch_size)                
+            wiqa_b = wiqa_b.to(device)
+            
             # Setup for forward
             cw_idxs = cw_idxs.to(device)
             qw_idxs = qw_idxs.to(device)
             cc_idxs = cc_idxs.to(device)
             qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
+            
             # Forward
-            log_p1, log_p2 = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
+            log_p1, log_p2 = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs, wiq_b, wiqa_b)
             y1, y2 = y1.to(device), y2.to(device)
             loss = F.nll_loss(log_p1, y1) + F.nll_loss(log_p2, y2)
             nll_meter.update(loss.item(), batch_size)
@@ -212,29 +226,51 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
 
     return results, pred_dict
 
-def wiq_binary(qw_idxs, cw_idxs, y1, y2, batch_size):
+def wiq_binary(qw_idxs, cw_idxs, batch_size):
     """
-    Binary word-in-question feature based from "Making Neural QA as Simple as Possible but not Simpler"
+    Binary word-in-question feature adapted from "Making Neural QA as Simple as Possible but not Simpler"
     by Dirk Weissenborn, Georg Wiese, and Laura Seiffe (https://arxiv.org/pdf/1703.04816.pdf)
-    1: tokens that are part of the question
+    idx: index of tokens that are part of the question
     0: tokens aren't part of the question
     """
     wiq_all = []
     for j in range(batch_size):
-        aw_idxs = cw_idxs[j][y1[j] : y2[j]]
-        wiq = np.array([0 for j in range(len(qw_idxs[j]))])
-        if aw_idxs.nelement() == 0:
-            # No answer
-            wiq_all.append(wiq)
-            continue
-        for idx in aw_idxs:
-            if idx in qw_idxs[j]:
-                contains_word = (qw_idxs[j] == idx).nonzero(as_tuple=True)[0]
-                for i in contains_word:
-                    wiq[i] = 1
+        wiq = np.array([0 for j in range(len(cw_idxs[j]))])
+        for idx in qw_idxs[j]:
+            in_q_and_c = (cw_idxs[j] == idx).nonzero(as_tuple=True)[0]       
+            for i in in_q_and_c:
+                wiq[i] = idx
         wiq_all.append(wiq)
     wiq_all = torch.as_tensor(np.array(wiq_all))
     return wiq_all      
-            
+
+
+def wiqa_binary(qw_idxs, cw_idxs, y1, y2, batch_size):
+    """
+    This word-in-question-answer feature will highlight words in the question that also show up in the answer 
+    which is a subpart of the context.
+    It is adapted from the binary word-in-question feature from "Making Neural QA as Simple as Possible but not Simpler"
+    by Dirk Weissenborn, Georg Wiese, and Laura Seiffe (https://arxiv.org/pdf/1703.04816.pdf).
+    idx: index of tokens that are in the question and answer
+    0: tokens that aren't part of the question and answer
+    """
+    wiqa_all = []
+    for j in range(batch_size):
+        aw_idxs = cw_idxs[j][y1[j] : y2[j]] # contains indexes of words 
+        wiqa = np.array([0 for j in range(len(qw_idxs[j]))])
+        if aw_idxs.nelement() == 0:
+            # No answer
+            wiqa_all.append(wiqa)
+            continue
+        for idx in aw_idxs:
+            if idx in qw_idxs[j]: # if index of word in answer is in the question as well
+                in_q_and_a = (qw_idxs[j] == idx).nonzero(as_tuple=True)[0]
+                for i in in_q_and_a:
+                    wiqa[i] = idx
+        wiqa_all.append(wiqa)
+    wiqa_all = torch.as_tensor(np.array(wiqa_all))
+    return wiqa_all      
+    
+           
 if __name__ == '__main__':
     main(get_train_args())
