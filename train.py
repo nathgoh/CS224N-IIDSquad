@@ -98,6 +98,9 @@ def main(args):
         with torch.enable_grad(), \
                 tqdm(total=len(train_loader.dataset)) as progress_bar:
             for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in train_loader:
+                # Word-in-question features
+                wiq_b = wiq_binary(qw_idxs, cw_idxs, y1, y2, args.batch_size)                
+                
                 # Setup for forward
                 cw_idxs = cw_idxs.to(device)
                 qw_idxs = qw_idxs.to(device)
@@ -164,6 +167,7 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
 
     model.eval()
     pred_dict = {}
+    
     with open(eval_file, 'r') as fh:
         gold_dict = json_load(fh)
     with torch.no_grad(), \
@@ -175,7 +179,6 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             cc_idxs = cc_idxs.to(device)
             qc_idxs = qc_idxs.to(device)
             batch_size = cw_idxs.size(0)
-
             # Forward
             log_p1, log_p2 = model(cw_idxs, qw_idxs, cc_idxs, qc_idxs)
             y1, y2 = y1.to(device), y2.to(device)
@@ -209,6 +212,29 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
 
     return results, pred_dict
 
-
+def wiq_binary(qw_idxs, cw_idxs, y1, y2, batch_size):
+    """
+    Binary word-in-question feature based from "Making Neural QA as Simple as Possible but not Simpler"
+    by Dirk Weissenborn, Georg Wiese, and Laura Seiffe (https://arxiv.org/pdf/1703.04816.pdf)
+    1: tokens that are part of the question
+    0: tokens aren't part of the question
+    """
+    wiq_all = []
+    for j in range(batch_size):
+        aw_idxs = cw_idxs[j][y1[j] : y2[j]]
+        wiq = np.array([0 for j in range(len(qw_idxs[j]))])
+        if aw_idxs.nelement() == 0:
+            # No answer
+            wiq_all.append(wiq)
+            continue
+        for idx in aw_idxs:
+            if idx in qw_idxs[j]:
+                contains_word = (qw_idxs[j] == idx).nonzero(as_tuple=True)[0]
+                for i in contains_word:
+                    wiq[i] = 1
+        wiq_all.append(wiq)
+    wiq_all = torch.as_tensor(np.array(wiq_all))
+    return wiq_all      
+            
 if __name__ == '__main__':
     main(get_train_args())
