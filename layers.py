@@ -48,14 +48,17 @@ class WordEmbedding(nn.Module):
         self.drop_prob = drop_prob
         self.word_embed = nn.Embedding.from_pretrained(word_vectors, freeze=True)
         self.proj = nn.Linear(word_vectors.size(1), hidden_size, bias=False)
-        self.hwy = HighwayEncoder(2, 2 * hidden_size)
+        self.hwy = HighwayEncoder(2, 3 * hidden_size)
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2, feature):
+        feature_embed = self.word_embed(feature)
+        feature_embed = self.proj(feature_embed)
+        
         emb = self.word_embed(x1)  # (batch_size, seq_len, embed_size)
         emb = F.dropout(emb, self.drop_prob, self.training)
         emb = self.proj(emb)  # (batch_size, seq_len, hidden_size)        
-        emb = torch.cat([x2, emb], dim=-1)  # (batch_size, seq_len, hidden_size)
-        emb = self.hwy(emb)   # (batch_size, seq_len, 2 * hidden_size)
+        emb = torch.cat([x2, emb, feature_embed], dim=-1)  # (batch_size, seq_len, hidden_size)
+        emb = self.hwy(emb)   # (batch_size, seq_len, 3 * hidden_size)
 
         return emb
 
