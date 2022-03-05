@@ -207,6 +207,61 @@ class BiDAFAttention(nn.Module):
         return s
 
 
+class SelfAttention(nn.Module):
+    """Self-attention layer
+        
+    Based on R-NET: Machine Reading Comprehension With Self-Matching Attention
+    https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf
+    
+    Arg:
+        hidden_size (int): Hidden size used in the BiDAF model.
+        drop_prob (float): Probability of zero-ing out activations.
+    """
+    def __init__(self, hidden_size, drop_prob):
+        super(SelfAttention, self).__init__()
+
+        self.drop_prob = drop_prob
+        self.weight = nn.Parameter(torch.zeros(1, 4 * hidden_size)) 
+        self.c_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
+        self.q_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
+        for weight in (self.c_weight, self.q_weight, self.weight):
+            nn.init.xavier_uniform_(weight)
+
+    def forward(self, att):
+        # att dim = (batch_size, c_len, 8 * hidden_size)
+        batch_size, c_len, hidden_size = att.size()
+        att = att.permute(0, 2, 1)
+       
+        c_weight = self.c_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size 1, hidden_size)
+        q_weight = self.q_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size 1, hidden_size)
+        c_prod = self.get_matrix_product(c_weight, att)
+        q_prod = self.get_matrix_product(q_weight, att)
+        
+        tanh = torch.tanh(c_prod + q_prod) # (batch_size, c_len, c_len, hidden_size, 1)
+    
+        weight = self.weight.unsqueeze(0).expand(batch_size, 1, hidden_size) # (batch_size 1, hidden_size)
+        weight = weight.unsqueeze(1).unsqueeze(1).expand(batch_size, c_len, c_len, 1, hidden_size) # (batch_size, c_len, c_len, 1, hidden_size)
+
+        s = torch.matmul(weight, tanh).squeeze(4).squeeze(3)
+        self_att = F.softmax(s, -1) # (batch_size, c_len, c_len)
+        self_att= self_att.unsqueeze(3).unsqueeze(4) # (batch_size, c_len, c_len, 1, 1)
+        att = att.reshape(batch_size, c_len, 1, hidden_size).unsqueeze(1).expand(batch_size, c_len, c_len, 1, hidden_size)
+        
+        c = torch.sum(self_att * att, 2).squeeze(2) # (batch_size, c_len, hidden_size)
+        return c
+    
+    def get_matrix_product(self, matrix, att):
+        batch_size, hidden_size, c_len = att.size()
+        
+        matrix_prod = torch.matmul(matrix, att) # (batch_size, hidden_size, c_len)
+        matrix_prod = torch.transpose(matrix_prod, 1, 2) # (batch_size, c_len, hidden_size)
+        matrix_prod = matrix_prod.unsqueeze(1) # (batch_size, 1, c_len, hidden_size)
+        matrix_prod = matrix_prod.unsqueeze(4) # (batch_size, 1, c_len, hidden_size, 1)
+        matrix_prod = matrix_prod.expand(batch_size, c_len, c_len, hidden_size, 1) # (batch_size, c_len, c_len, hidden_size, 1)
+        
+        return matrix_prod
+       
+
 class BiDAFOutput(nn.Module):
     """Output layer used by BiDAF for question answering.
 

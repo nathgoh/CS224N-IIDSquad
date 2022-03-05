@@ -48,6 +48,9 @@ class BiDAF(nn.Module):
 
         self.att = layers.BiDAFAttention(hidden_size=2 * hidden_size,
                                          drop_prob=drop_prob)
+        
+        self.self_att = layers.SelfAttention(hidden_size=2 * hidden_size,
+                                             drop_prob=drop_prob)
 
         self.mod = layers.RNNEncoder(input_size=8 * hidden_size,
                                      hidden_size=hidden_size,
@@ -73,6 +76,8 @@ class BiDAF(nn.Module):
 
         att = self.att(cw_enc, qw_enc,
                        c_mask, q_mask)    # (batch_size, c_len, 8 * hidden_size)
+
+        att = self.self_att(att)       
 
         mod = self.mod(att, c_len)        # (batch_size, c_len, 2 * hidden_size)
 
