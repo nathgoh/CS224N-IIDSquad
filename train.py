@@ -21,7 +21,7 @@ from models import BiDAF
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from ujson import load as json_load
-from util import collate_fn, SQuAD
+from util import collate_fn, SQuAD, wiq_binary, wiqa_binary
 
 
 def main(args):
@@ -147,7 +147,7 @@ def main(args):
                     results, pred_dict = evaluate(model, dev_loader, device,
                                                   args.dev_eval_file,
                                                   args.max_ans_len,
-                                                  args.use_squad_v2)
+                                                  args.use_squad_v2, args.batch_size)
                     saver.save(step, model, results[args.metric_name], device)
                     ema.resume(model)
 
@@ -167,7 +167,7 @@ def main(args):
                                    num_visuals=args.num_visuals)
 
 
-def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
+def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2, batch_size):
     nll_meter = util.AverageMeter()
 
     model.eval()
@@ -179,11 +179,11 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
             tqdm(total=len(data_loader.dataset)) as progress_bar:
         for cw_idxs, cc_idxs, qw_idxs, qc_idxs, y1, y2, ids in data_loader:
             # Word-in-question feature
-            wiq_b = wiq_binary(qw_idxs, cw_idxs, args.batch_size)                
+            wiq_b = wiq_binary(qw_idxs, cw_idxs, batch_size)                
             wiq_b = wiq_b.to(device)
             
             # Word-in-question-answer feature
-            wiqa_b = wiqa_binary(qw_idxs, cw_idxs, y1, y2, args.batch_size)                
+            wiqa_b = wiqa_binary(qw_idxs, cw_idxs, y1, y2, batch_size)                
             wiqa_b = wiqa_b.to(device)
             
             # Setup for forward
@@ -225,52 +225,6 @@ def evaluate(model, data_loader, device, eval_file, max_len, use_squad_v2):
     results = OrderedDict(results_list)
 
     return results, pred_dict
-
-def wiq_binary(qw_idxs, cw_idxs, batch_size):
-    """
-    Binary word-in-question feature adapted from "Making Neural QA as Simple as Possible but not Simpler"
-    by Dirk Weissenborn, Georg Wiese, and Laura Seiffe (https://arxiv.org/pdf/1703.04816.pdf)
-    idx: index of tokens that are part of the question
-    0: tokens aren't part of the question
-    """
-    wiq_all = []
-    for j in range(batch_size):
-        wiq = np.array([0 for j in range(len(cw_idxs[j]))])
-        for idx in qw_idxs[j]:
-            in_q_and_c = (cw_idxs[j] == idx).nonzero(as_tuple=True)[0]       
-            for i in in_q_and_c:
-                wiq[i] = idx
-        wiq_all.append(wiq)
-    wiq_all = torch.as_tensor(np.array(wiq_all))
-    return wiq_all      
-
-
-def wiqa_binary(qw_idxs, cw_idxs, y1, y2, batch_size):
-    """
-    This word-in-question-answer feature will highlight words in the question that also show up in the answer 
-    which is a subpart of the context.
-    It is adapted from the binary word-in-question feature from "Making Neural QA as Simple as Possible but not Simpler"
-    by Dirk Weissenborn, Georg Wiese, and Laura Seiffe (https://arxiv.org/pdf/1703.04816.pdf).
-    idx: index of tokens that are in the question and answer
-    0: tokens that aren't part of the question and answer
-    """
-    wiqa_all = []
-    for j in range(batch_size):
-        aw_idxs = cw_idxs[j][y1[j] : y2[j]] # contains indexes of words 
-        wiqa = np.array([0 for j in range(len(qw_idxs[j]))])
-        if aw_idxs.nelement() == 0:
-            # No answer
-            wiqa_all.append(wiqa)
-            continue
-        for idx in aw_idxs:
-            if idx in qw_idxs[j]: # if index of word in answer is in the question as well
-                in_q_and_a = (qw_idxs[j] == idx).nonzero(as_tuple=True)[0]
-                for i in in_q_and_a:
-                    wiqa[i] = idx
-        wiqa_all.append(wiqa)
-    wiqa_all = torch.as_tensor(np.array(wiqa_all))
-    return wiqa_all      
-    
            
 if __name__ == '__main__':
     main(get_train_args())
