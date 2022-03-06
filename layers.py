@@ -210,8 +210,10 @@ class BiDAFAttention(nn.Module):
 class SelfAttention(nn.Module):
     """Self-attention layer
         
-    Based on R-NET: Machine Reading Comprehension With Self-Matching Attention
+    Based on R-NET: Machine Reading Comprehension With Self-Matching Attention.
     https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf
+    We implement the self-matching layer as described in the paper except with the addition
+    of the dropout layer to add more variability during training.
     
     Arg:
         hidden_size (int): Hidden size used in the BiDAF model.
@@ -238,8 +240,8 @@ class SelfAttention(nn.Module):
         c_weight = F.dropout(c_weight, self.drop_prob, self.training)
         q_weight = F.dropout(q_weight, self.drop_prob, self.training)
         
-        c_prod = self.get_matrix_product(c_weight, att)
-        q_prod = self.get_matrix_product(q_weight, att)
+        c_prod = self.get_matrix_product(c_weight, att) # (batch_size, c_len, hidden_size)
+        q_prod = self.get_matrix_product(q_weight, att) # (batch_size, c_len, hidden_size)
         
         tanh = torch.tanh(c_prod + q_prod) # (batch_size, c_len, hidden_size)
         tanh = tanh.unsqueeze(3).expand(batch_size, c_len, hidden_size, 1) # (batch_size, c_len, hidden_size, 1)
