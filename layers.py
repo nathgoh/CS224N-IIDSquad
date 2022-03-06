@@ -224,7 +224,6 @@ class SelfAttention(nn.Module):
         self.weight = nn.Parameter(torch.zeros(1, 4 * hidden_size)) 
         self.c_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
         self.q_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
-        self.max_pool = nn.MaxPool2d(kernel_size = (1, 5))
         for weight in (self.c_weight, self.q_weight, self.weight):
             nn.init.xavier_uniform_(weight)
 
@@ -233,8 +232,12 @@ class SelfAttention(nn.Module):
         batch_size, c_len, hidden_size = att.size()
         att = att.permute(0, 2, 1)
        
-        c_weight = self.c_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size 1, hidden_size)
-        q_weight = self.q_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size 1, hidden_size)
+        c_weight = self.c_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
+        q_weight = self.q_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
+        
+        c_weight = F.dropout(c_weight, self.drop_prob, self.training)
+        q_weight = F.dropout(q_weight, self.drop_prob, self.training)
+        
         c_prod = self.get_matrix_product(c_weight, att)
         q_prod = self.get_matrix_product(q_weight, att)
         
