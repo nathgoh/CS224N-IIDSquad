@@ -229,16 +229,13 @@ class SelfAttention(nn.Module):
         for weight in (self.c_weight, self.q_weight, self.weight):
             nn.init.xavier_uniform_(weight)
 
-    def forward(self, att):
-        # att dim = (batch_size, c_len, hidden_size)
-        batch_size, c_len, hidden_size = att.size()
-        att = att.permute(0, 2, 1)
-       
+    def forward(self, att, c_mask):
+        batch_size, c_len, hidden_size = att.size() 
+        att = att.permute(0, 2, 1) # (batch_size, hidden_size, c_len    )
+        c_mask = c_mask.view(batch_size, c_len, 1).unsqueeze(3)  # (batch_size, c_len, 1, 1)
+        
         c_weight = self.c_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
         q_weight = self.q_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
-        
-        c_weight = F.dropout(c_weight, self.drop_prob, self.training)
-        q_weight = F.dropout(q_weight, self.drop_prob, self.training)
         
         c_prod = self.get_matrix_product(c_weight, att) # (batch_size, c_len, hidden_size)
         q_prod = self.get_matrix_product(q_weight, att) # (batch_size, c_len, hidden_size)
@@ -250,10 +247,10 @@ class SelfAttention(nn.Module):
         weight = weight.unsqueeze(1).expand(batch_size, c_len, 1, hidden_size) # (batch_size, c_len, 1, hidden_size)
 
         s = torch.matmul(weight, tanh) # (batch_size, c_len, 1, 1)
-        self_att = F.softmax(s, -1) # (batch_size, c_len, 1, 1)
+        self_att = masked_softmax(s, c_mask, dim=1) # (batch_size, c_len, 1, 1)
         att = att.reshape(batch_size, c_len, 1, hidden_size) # (batch_size, c_len, 1, hidden_size)
         
-        c = torch.sum(self_att * att, 2).squeeze(2) # (batch_size, c_len, hidden_size)
+        c = torch.sum(self_att * att, 2) # (batch_size, c_len, hidden_size)
         return c
     
     def get_matrix_product(self, matrix, att):
