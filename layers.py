@@ -207,59 +207,55 @@ class BiDAFAttention(nn.Module):
         return s
 
 
-class SelfAttention(nn.Module):
+class MultiHeadedSelfAttention(nn.Module):
     """Self-attention layer
         
-    Based on R-NET: Machine Reading Comprehension With Self-Matching Attention.
-    https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf
-    We implement the self-matching layer as described in the paper except with the addition
-    of the dropout layer to add more variability during training.
+    Based on "Attention Is All You Need"
+    by: Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez,
+    Łukasz Kaiser, and Illia Polosukhin
+    https://arxiv.org/pdf/1706.03762.pdf
+    We implement the multi-head attention layer as described in the paper.
     
     Arg:
         hidden_size (int): Hidden size used in the BiDAF model.
+        num_heads (int): Number of parallel attention layers
         drop_prob (float): Probability of zero-ing out activations.
     """
-    def __init__(self, hidden_size, drop_prob):
-        super(SelfAttention, self).__init__()
+    def __init__(self, hidden_size, num_heads, drop_prob):
+        super(MultiHeadedSelfAttention, self).__init__()
 
         self.drop_prob = drop_prob
-        self.weight = nn.Parameter(torch.zeros(1, 4 * hidden_size)) 
-        self.c_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
-        self.q_weight = nn.Parameter(torch.zeros(4 * hidden_size, 4 * hidden_size)) 
-        for weight in (self.c_weight, self.q_weight, self.weight):
-            nn.init.xavier_uniform_(weight)
+        self.num_heads = num_heads
+        self.head_dim = hidden_size // self.num_heads
+        
+        self.Q = nn.Linear(hidden_size, hidden_size)
+        self.K = nn.Linear(hidden_size, hidden_size)
+        self.O = nn.Linear(hidden_size, hidden_size)
+        self.V = nn.Linear(hidden_size, hidden_size)
+        
+        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to('cuda:0')
 
     def forward(self, att, c_mask):
         batch_size, c_len, hidden_size = att.size() 
-        att = att.permute(0, 2, 1) # (batch_size, hidden_size, c_len    )
-        c_mask = c_mask.view(batch_size, c_len, 1).unsqueeze(3)  # (batch_size, c_len, 1, 1)
+        c_mask = c_mask.view(batch_size, 1, 1, c_len)
+       
+        Q = self.Q(att) # (batch_size, c_len, hidden_size)
+        K = self.K(att) # (batch_size, c_len, hidden_size)
+        V = self.V(att) # (batch_size, c_len, hidden_size)
         
-        c_weight = self.c_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
-        q_weight = self.q_weight.unsqueeze(0).expand(batch_size, hidden_size, hidden_size) # (batch_size, hidden_size, hidden_size)
+        Q = Q.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
+        K = K.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
+        V = V.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
         
-        c_prod = self.get_matrix_product(c_weight, att) # (batch_size, c_len, hidden_size)
-        q_prod = self.get_matrix_product(q_weight, att) # (batch_size, c_len, hidden_size)
+        K = K.reshape(batch_size, self.num_heads, self.head_dim, c_len)
         
-        tanh = torch.tanh(c_prod + q_prod) # (batch_size, c_len, hidden_size)
-        tanh = tanh.unsqueeze(3).expand(batch_size, c_len, hidden_size, 1) # (batch_size, c_len, hidden_size, 1)
-
-        weight = self.weight.unsqueeze(0).expand(batch_size, 1, hidden_size) # (batch_size, 1, hidden_size)
-        weight = weight.unsqueeze(1).expand(batch_size, c_len, 1, hidden_size) # (batch_size, c_len, 1, hidden_size)
-
-        s = torch.matmul(weight, tanh) # (batch_size, c_len, 1, 1)
-        self_att = masked_softmax(s, c_mask, dim=1) # (batch_size, c_len, 1, 1)
-        att = att.reshape(batch_size, c_len, 1, hidden_size) # (batch_size, c_len, 1, hidden_size)
-        
-        c = torch.sum(self_att * att, 2) # (batch_size, c_len, hidden_size)
-        return c
-    
-    def get_matrix_product(self, matrix, att):
-        batch_size, hidden_size, c_len = att.size()
-        
-        matrix_prod = torch.matmul(matrix, att) # (batch_size, hidden_size, c_len)
-        matrix_prod = torch.transpose(matrix_prod, 1, 2) # (batch_size, c_len, hidden_size)
-
-        return matrix_prod
+        self_att = masked_softmax(torch.matmul(Q, K) / self.scale, c_mask) # (batch_size, num_heads, c_len, c_len)
+        self_att = F.dropout(self_att, self.drop_prob, self.training)
+        self_att = torch.matmul(self_att, V).reshape(batch_size, self.num_heads, c_len, self.head_dim)
+        self_att = self_att.reshape(batch_size, c_len, self.num_heads * self.head_dim) # (batch_size, c_len, num_heads * head_dim)
+        self_att = self.O(self_att)
+            
+        return self_att
        
 
 class BiDAFOutput(nn.Module):
