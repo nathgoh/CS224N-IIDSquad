@@ -243,15 +243,17 @@ class MultiHeadedSelfAttention(nn.Module):
         K = self.K(att) # (batch_size, c_len, hidden_size)
         V = self.V(att) # (batch_size, c_len, hidden_size)
         
-        Q = Q.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
-        K = K.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
-        V = V.unsqueeze(1).reshape(batch_size, self.num_heads, c_len, self.head_dim) # (batch_size, num_heads, c_len, head_dim)
+        Q = Q.unsqueeze(1).reshape(batch_size, c_len, self.num_heads, self.head_dim) 
+        K = K.unsqueeze(1).reshape(batch_size, c_len, self.head_dim,  self.num_heads) 
+        V = V.unsqueeze(1).reshape(batch_size, c_len, self.num_heads, self.head_dim) 
         
-        K = K.reshape(batch_size, self.num_heads, self.head_dim, c_len)
+        Q = Q.transpose(1, 2)
+        K = K.transpose(1, 3)
+        V = V.transpose(1, 2)
         
-        self_att = masked_softmax(torch.matmul(Q, K) / self.scale, c_mask) # (batch_size, num_heads, c_len, c_len)
+        self_att = F.softmax(torch.matmul(Q, K) / self.scale, dim=-1) # (batch_size, num_heads, c_len, c_len)
         self_att = F.dropout(self_att, self.drop_prob, self.training)
-        self_att = torch.matmul(self_att, V).reshape(batch_size, self.num_heads, c_len, self.head_dim)
+        self_att = torch.matmul(self_att, V).transpose(1, 2)
         self_att = self_att.reshape(batch_size, c_len, self.num_heads * self.head_dim) # (batch_size, c_len, num_heads * head_dim)
         self_att = self.O(self_att)
             
