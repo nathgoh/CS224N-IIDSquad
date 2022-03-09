@@ -1,7 +1,5 @@
 # CS224N default final project (2022 IID SQuAD track)
 This is a full implementation of the [BiDAF](https://arxiv.org/pdf/1611.01603.pdf) paper
-
->>>>>>> 1edefe9 (Update README.md)
 ## Setup
 
 1. Make sure you have [Miniconda](https://conda.io/docs/user-guide/install/index.html#regular-installation) installed
