@@ -1,7 +1,8 @@
+from ujson import load as json_load
 import json
 import math
-from ujson import load as json_load
 import pandas as pd
+import matplotlib.pyplot as plt
 
 baseline_result = './save/test/baseline-dev-01/dev_submission.csv'
 full_BiDAF = './save/test/full-BiDAF-dev-01/submission.csv'
@@ -96,9 +97,29 @@ def qual_analysis():
               question_EMs[i]['other'] += 1
 
   for em in question_EMs:
-    for category in question_categories:
-      em[category] /= em[category]
+    for category in question_categories.keys():
+      em[category] /= question_categories[category]
       em[category] *= 100   
+  
+  em_data = {'Baseline': [question_EMs[0]['what'], question_EMs[0]['who'], question_EMs[0]['when'], question_EMs[0]['where'], question_EMs[0]['why'], question_EMs[0]['which'], question_EMs[0]['how'], question_EMs[0]['other']], 
+             'Char Embeddings': [question_EMs[1]['what'], question_EMs[1]['who'], question_EMs[1]['when'], question_EMs[1]['where'], question_EMs[1]['why'], question_EMs[1]['which'], question_EMs[1]['how'], question_EMs[1]['other']], 
+             'Char Embeddings + Wiq': [question_EMs[2]['what'], question_EMs[2]['who'], question_EMs[2]['when'], question_EMs[2]['where'], question_EMs[2]['why'], question_EMs[2]['which'], question_EMs[2]['how'], question_EMs[2]['other']], 
+             'Char Embeddings + Wiq + Self-Attention': [question_EMs[3]['what'], question_EMs[3]['who'], question_EMs[3]['when'], question_EMs[3]['where'], question_EMs[3]['why'], question_EMs[3]['which'], question_EMs[3]['how'], question_EMs[3]['other']]}
+  
+  # bar_df = pd.DataFrame(em_data, columns=['Baseline', 'Char Embeddings', 'Char Embeddings + Wiq', 'Char Embeddings + Wiq + Self-Attention'],
+  #                       index=['What', 'Who', 'When', 'Where', 'Why', 'Which', 'How', 'Other'])
+  # bar_df.plot.bar()
+  # plt.xlabel('Question Type')
+  # plt.ylabel('EM')
+  # plt.show()
+
+  question_type = list(question_categories.keys())
+  count = list(question_categories.values())
+  
+  plt.bar(range(len(question_categories)), count, tick_label=question_type)
+  plt.xlabel('Question Type')
+  plt.ylabel('Count')
+  plt.show()
 
 if __name__ == '__main__':
   qual_analysis()
