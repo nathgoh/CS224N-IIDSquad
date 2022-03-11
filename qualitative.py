@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 baseline_result = './save/test/baseline-dev-01/dev_submission.csv'
 full_BiDAF = './save/test/full-BiDAF-dev-01/submission.csv'
 wiq_BiDAF = './save/test/wiq-BiDAF-dev-01/submission.csv'
+self_att_BiDAF = './save/test/self_att-BiDAF-dev-01/dev_submission.csv'
 self_att_wiq_BiDAF = './save/test/self_att-wiq-BiDAF-dev-01/submission.csv'
-dev_results = [baseline_result, full_BiDAF, wiq_BiDAF, self_att_wiq_BiDAF]
+dev_results = [baseline_result, full_BiDAF, wiq_BiDAF, self_att_BiDAF, self_att_wiq_BiDAF]
 dev_eval_file = './data/dev_eval.json'
 
 def qual_analysis():
@@ -25,6 +26,7 @@ def qual_analysis():
                          'other': 0}
   
   question_EMs = [{'what': 0, 'who': 0, 'when': 0, 'where': 0, 'why': 0, 'which': 0, 'how': 0, 'other': 0},
+                  {'what': 0, 'who': 0, 'when': 0, 'where': 0, 'why': 0, 'which': 0, 'how': 0, 'other': 0},
                   {'what': 0, 'who': 0, 'when': 0, 'where': 0, 'why': 0, 'which': 0, 'how': 0, 'other': 0},
                   {'what': 0, 'who': 0, 'when': 0, 'where': 0, 'why': 0, 'which': 0, 'how': 0, 'other': 0},
                   {'what': 0, 'who': 0, 'when': 0, 'where': 0, 'why': 0, 'which': 0, 'how': 0, 'other': 0}]
@@ -104,22 +106,24 @@ def qual_analysis():
   em_data = {'Baseline': [question_EMs[0]['what'], question_EMs[0]['who'], question_EMs[0]['when'], question_EMs[0]['where'], question_EMs[0]['why'], question_EMs[0]['which'], question_EMs[0]['how'], question_EMs[0]['other']], 
              'Char Embeddings': [question_EMs[1]['what'], question_EMs[1]['who'], question_EMs[1]['when'], question_EMs[1]['where'], question_EMs[1]['why'], question_EMs[1]['which'], question_EMs[1]['how'], question_EMs[1]['other']], 
              'Char Embeddings + Wiq': [question_EMs[2]['what'], question_EMs[2]['who'], question_EMs[2]['when'], question_EMs[2]['where'], question_EMs[2]['why'], question_EMs[2]['which'], question_EMs[2]['how'], question_EMs[2]['other']], 
-             'Char Embeddings + Wiq + Self-Attention': [question_EMs[3]['what'], question_EMs[3]['who'], question_EMs[3]['when'], question_EMs[3]['where'], question_EMs[3]['why'], question_EMs[3]['which'], question_EMs[3]['how'], question_EMs[3]['other']]}
+             'Self-Attention': [question_EMs[3]['what'], question_EMs[3]['who'], question_EMs[3]['when'], question_EMs[3]['where'], question_EMs[3]['why'], question_EMs[3]['which'], question_EMs[3]['how'], question_EMs[3]['other']],
+             'Char Embeddings + Wiq + Self-Attention': [question_EMs[4]['what'], question_EMs[4]['who'], question_EMs[4]['when'], question_EMs[4]['where'], question_EMs[4]['why'], question_EMs[4]['which'], question_EMs[4]['how'], question_EMs[4]['other']]}
   
-  # bar_df = pd.DataFrame(em_data, columns=['Baseline', 'Char Embeddings', 'Char Embeddings + Wiq', 'Char Embeddings + Wiq + Self-Attention'],
-  #                       index=['What', 'Who', 'When', 'Where', 'Why', 'Which', 'How', 'Other'])
-  # bar_df.plot.bar()
-  # plt.xlabel('Question Type')
-  # plt.ylabel('EM')
-  # plt.show()
-
-  question_type = list(question_categories.keys())
-  count = list(question_categories.values())
-  
-  plt.bar(range(len(question_categories)), count, tick_label=question_type)
+  bar_df = pd.DataFrame(em_data, columns=['Baseline', 'Char Embeddings', 'Char Embeddings + Wiq', 'Self-Attention', 'Char Embeddings + Wiq + Self-Attention'],
+                        index=['What', 'Who', 'When', 'Where', 'Why', 'Which', 'How', 'Other'])
+  bar_df.plot.bar()
+  plt.rc('font', size=16)
   plt.xlabel('Question Type')
-  plt.ylabel('Count')
+  plt.ylabel('EM')
   plt.show()
+
+  # question_type = list(question_categories.keys())
+  # count = list(question_categories.values())
+  
+  # plt.bar(range(len(question_categories)), count, tick_label=question_type)
+  # plt.xlabel('Question Type')
+  # plt.ylabel('Count')
+  # plt.show()
 
 if __name__ == '__main__':
   qual_analysis()
