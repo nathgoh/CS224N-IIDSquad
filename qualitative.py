@@ -106,10 +106,10 @@ def qual_analysis():
   em_data = {'Baseline': [question_EMs[0]['what'], question_EMs[0]['who'], question_EMs[0]['when'], question_EMs[0]['where'], question_EMs[0]['why'], question_EMs[0]['which'], question_EMs[0]['how'], question_EMs[0]['other']], 
              'Char Embeddings': [question_EMs[1]['what'], question_EMs[1]['who'], question_EMs[1]['when'], question_EMs[1]['where'], question_EMs[1]['why'], question_EMs[1]['which'], question_EMs[1]['how'], question_EMs[1]['other']], 
              'Char Embeddings + Wiq': [question_EMs[2]['what'], question_EMs[2]['who'], question_EMs[2]['when'], question_EMs[2]['where'], question_EMs[2]['why'], question_EMs[2]['which'], question_EMs[2]['how'], question_EMs[2]['other']], 
-             'Self-Attention': [question_EMs[3]['what'], question_EMs[3]['who'], question_EMs[3]['when'], question_EMs[3]['where'], question_EMs[3]['why'], question_EMs[3]['which'], question_EMs[3]['how'], question_EMs[3]['other']],
+             'Char Embeddings + Self-Attention': [question_EMs[3]['what'], question_EMs[3]['who'], question_EMs[3]['when'], question_EMs[3]['where'], question_EMs[3]['why'], question_EMs[3]['which'], question_EMs[3]['how'], question_EMs[3]['other']],
              'Char Embeddings + Wiq + Self-Attention': [question_EMs[4]['what'], question_EMs[4]['who'], question_EMs[4]['when'], question_EMs[4]['where'], question_EMs[4]['why'], question_EMs[4]['which'], question_EMs[4]['how'], question_EMs[4]['other']]}
   
-  bar_df = pd.DataFrame(em_data, columns=['Baseline', 'Char Embeddings', 'Char Embeddings + Wiq', 'Self-Attention', 'Char Embeddings + Wiq + Self-Attention'],
+  bar_df = pd.DataFrame(em_data, columns=['Baseline', 'Char Embeddings', 'Char Embeddings + Wiq', 'Char Embeddings + Self-Attention', 'Char Embeddings + Wiq + Self-Attention'],
                         index=['What', 'Who', 'When', 'Where', 'Why', 'Which', 'How', 'Other'])
   bar_df.plot.bar()
   plt.rc('font', size=16)
