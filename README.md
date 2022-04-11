@@ -22,4 +22,4 @@
     2. You may find it helpful to browse the arguments provided by the starter code. Either look directly at the `parser.add_argument` lines in the source code, or run `python train.py -h`.
 
 ## Poster
-[CS224N Poster](https://github.com/nathgoh/CS224N-IIDSquad/files/8461361/CS224N.Poster.pptx.pdf)
+![cs224n poster](https://user-images.githubusercontent.com/20431681/162673238-e1c270ba-2dc1-41ce-bf64-cfb0128b7fd2.png)
