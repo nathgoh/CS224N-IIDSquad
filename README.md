@@ -1,4 +1,6 @@
 # CS224N default final project (2022 IID SQuAD track)
+## Poster
+![cs224n poster](https://user-images.githubusercontent.com/20431681/162673238-e1c270ba-2dc1-41ce-bf64-cfb0128b7fd2.png)
 ## Setup
 
 1. Make sure you have [Miniconda](https://conda.io/docs/user-guide/install/index.html#regular-installation) installed
@@ -20,6 +22,3 @@
 5. Browse the code in `train.py`
     1. The `train.py` script is the entry point for training a model. It reads command-line arguments, loads the SQuAD dataset, and trains a model.
     2. You may find it helpful to browse the arguments provided by the starter code. Either look directly at the `parser.add_argument` lines in the source code, or run `python train.py -h`.
-
-## Poster
-![cs224n poster](https://user-images.githubusercontent.com/20431681/162673238-e1c270ba-2dc1-41ce-bf64-cfb0128b7fd2.png)
